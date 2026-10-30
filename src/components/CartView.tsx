@@ -10,6 +10,15 @@ import { asset } from "@/lib/asset";
 import { clock, useCountdown } from "./useCountdown";
 
 const GRADES_KEY = "grades-supported";
+const BUYER_KEY = "buyer";
+
+const CHECKOUT_PROBLEMS: Record<string, string> = {
+  seats_changed: "Some of your seats were released before checkout. Please look over your cart and try again.",
+  empty_cart: "Your cart is empty. Your seats may have been released.",
+  below_minimum: "This total is too small to charge to a card. Please add a seat or contact us.",
+  payments_not_configured: "Online payment isn't turned on yet. Your seats stay held until the timer runs out.",
+  payment_error: "We couldn't open the payment page. Please try again in a moment.",
+};
 
 function loadGrades(): Record<string, string[]> {
   try {
@@ -19,23 +28,44 @@ function loadGrades(): Record<string, string[]> {
   }
 }
 
-export default function CartView({ initial, multiNightPercent }: { initial: Cart; multiNightPercent: number }) {
+export default function CartView({
+  initial,
+  multiNightPercent,
+  paymentCancelled,
+}: {
+  initial: Cart;
+  multiNightPercent: number;
+  paymentCancelled: boolean;
+}) {
   const [cart, setCart] = useState(initial);
   const [grades, setGrades] = useState<Record<string, string[]>>({});
   const [showErrors, setShowErrors] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState(paymentCancelled ? "Payment cancelled. No charge was made, and your seats are still held." : "");
+  const [buyer, setBuyer] = useState({ name: "", email: "" });
+  const [fieldErrors, setFieldErrors] = useState<{ name?: boolean; email?: boolean }>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
   const [message, setMessage] = useState("");
   const firstError = useRef<HTMLFieldSetElement>(null);
 
-  // Remember grade choices for this visit, so they survive going back to the map.
-  useEffect(() => setGrades(loadGrades()), []);
+  // Remember choices for this visit, so they survive going back to the map.
+  useEffect(() => {
+    setGrades(loadGrades());
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(BUYER_KEY) ?? "null");
+      if (saved) setBuyer(saved);
+    } catch {
+      // Nothing saved.
+    }
+  }, []);
   useEffect(() => {
     try {
       sessionStorage.setItem(GRADES_KEY, JSON.stringify(grades));
+      sessionStorage.setItem(BUYER_KEY, JSON.stringify(buyer));
     } catch {
       // Private browsing can block storage; choices just won't be remembered.
     }
-  }, [grades]);
+  }, [grades, buyer]);
 
   async function refresh() {
     try {
@@ -79,13 +109,52 @@ export default function CartView({ initial, multiNightPercent }: { initial: Cart
   const problems = gradeProblems(cart.nights, grades);
   const q = cart.quote;
 
-  function continueToPayment() {
+  const nameOk = buyer.name.trim().length > 0;
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyer.email.trim());
+
+  async function continueToPayment() {
+    setNotice("");
+    setCheckoutError("");
     if (problems.length) {
       setShowErrors(true);
       setTimeout(() => firstError.current?.querySelector("input")?.focus(), 0);
       return;
     }
-    setNotice("Payment is the next build step and isn't connected yet. Your seats stay held until the timer runs out.");
+    if (!nameOk || !emailOk) {
+      setFieldErrors({ name: !nameOk, email: !emailOk });
+      document.getElementById(!nameOk ? "buyer-name" : "buyer-email")?.focus();
+      return;
+    }
+    setFieldErrors({});
+    setSubmitting(true);
+    try {
+      const res = await fetch(asset("api/checkout"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ buyerName: buyer.name, buyerEmail: buyer.email, grades }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        window.location.assign(data.url);
+        return;
+      }
+      if (data.reason === "invalid_name" || data.reason === "invalid_email") {
+        setFieldErrors({ name: data.reason === "invalid_name", email: data.reason === "invalid_email" });
+      } else if (data.reason === "missing_grades") {
+        setShowErrors(true);
+      } else {
+        setCheckoutError(CHECKOUT_PROBLEMS[data.reason] ?? CHECKOUT_PROBLEMS.payment_error);
+        if (data.reason === "seats_changed" || data.reason === "empty_cart") {
+          // The cart may now be empty, which hides the button area, so show it at the top too.
+          setNotice(CHECKOUT_PROBLEMS[data.reason]);
+          setCheckoutError("");
+          await refresh();
+        }
+      }
+    } catch {
+      setCheckoutError(CHECKOUT_PROBLEMS.payment_error);
+    }
+    setSubmitting(false);
   }
 
   if (cart.nights.length === 0) {
@@ -101,6 +170,7 @@ export default function CartView({ initial, multiNightPercent }: { initial: Cart
   return (
     <div className="cart">
       <div className="cart-nights">
+        {notice && <p className="notice" role="status">{notice}</p>}
         {secondsLeft !== null && (
           <p className={`hold-timer${secondsLeft <= 120 ? " ending" : ""}`}>
             Your seats are held for <strong>{clock(secondsLeft)}</strong>
@@ -184,10 +254,40 @@ export default function CartView({ initial, multiNightPercent }: { initial: Cart
         {q.problem === "below_minimum" && (
           <p className="field-error">This total is too small to charge to a card. Please add a seat or contact us.</p>
         )}
-        <button type="button" className="button wide" onClick={continueToPayment} disabled={q.problem !== null}>
-          Continue to payment
+        <div className="buyer-fields">
+          <label htmlFor="buyer-name">
+            Your name
+            <input
+              id="buyer-name"
+              autoComplete="name"
+              value={buyer.name}
+              maxLength={100}
+              onChange={(e) => setBuyer({ ...buyer, name: e.target.value })}
+              aria-invalid={fieldErrors.name || undefined}
+              aria-describedby={fieldErrors.name ? "buyer-name-error" : undefined}
+            />
+          </label>
+          {fieldErrors.name && <p id="buyer-name-error" className="field-error">Please enter your name.</p>}
+          <label htmlFor="buyer-email">
+            Email for your tickets
+            <input
+              id="buyer-email"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              value={buyer.email}
+              maxLength={254}
+              onChange={(e) => setBuyer({ ...buyer, email: e.target.value })}
+              aria-invalid={fieldErrors.email || undefined}
+              aria-describedby={fieldErrors.email ? "buyer-email-error" : undefined}
+            />
+          </label>
+          {fieldErrors.email && <p id="buyer-email-error" className="field-error">Please enter a valid email address.</p>}
+        </div>
+        <button type="button" className="button wide" onClick={continueToPayment} disabled={q.problem !== null || submitting}>
+          {submitting ? "One moment…" : q.totalCents === 0 ? "Confirm free tickets" : "Continue to payment"}
         </button>
-        {notice && <p className="notice" role="status">{notice}</p>}
+        {checkoutError && <p className="notice checkout-error" role="alert">{checkoutError}</p>}
       </aside>
 
       <p className="sr-only" aria-live="polite">{message}</p>

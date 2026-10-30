@@ -40,5 +40,6 @@
   "multiNightDiscountPercent": 20,
   "maxSeatsPerOrder": 10,
   "holdMinutes": 10,
-  "minChargeCents": 50
+  "minChargeCents": 50,
+  "checkoutMinutes": 30
 }

@@ -21,6 +21,8 @@ export type Pricing = {
   minChargeCents: number;
   maxSeatsPerOrder: number;
   holdMinutes: number;
+  /** How long seats stay held once the buyer goes to pay (Stripe's minimum is 30). */
+  checkoutMinutes: number;
 };
 
 /** A seat with its tier resolved and its position on the map worked out. */

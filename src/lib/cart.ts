@@ -1,5 +1,5 @@
 // The buyer's cart: every seat they hold, grouped by night, with a server-side price.
-import type { Db } from "./db";
+import type { Query } from "./db";
 import type { Performance, Venue } from "./types";
 import { quote, type Quote } from "./pricing";
 import { seatLabel } from "./layout";
@@ -9,12 +9,12 @@ export type CartNight = { performance: Performance; seats: CartSeat[] };
 export type Cart = { nights: CartNight[]; quote: Quote; expiresAt: string | null };
 
 export async function loadCart(
-  db: Db,
+  query: Query,
   token: string,
   venue: Venue,
   opts: { multiNightPercent: number; minChargeCents: number },
 ): Promise<Cart> {
-  const rows = await db.query(
+  const rows = await query(
     `select ps.performance_id, ps.hold_expires_at,
             s.id as seat_id, s.section, s.zone, s.row, s.number, s.accessible,
             t.id as tier_id, t.name as tier_name, t.price_cents,

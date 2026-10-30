@@ -3,7 +3,7 @@
 Reserved-seat ticketing for the Orange County Classical Academy winter performance.
 Separate from the fine arts site. The fine arts site only links here.
 
-**Status: build steps 1–4 of 8 done (seat map, database, seat holds, cart and pricing).** No payments yet. The seating chart, prices, and nights are placeholders.
+**Status: build steps 1–5 of 8 done (seat map, database, seat holds, cart and pricing, checkout).** Payments run in Stripe test mode once keys are added. The seating chart, prices, and nights are placeholders.
 
 ## Run it
 
@@ -83,6 +83,47 @@ Prices are always worked out on the server (`src/lib/pricing.ts`), in this order
 5. Round once, at the end. Per-seat prices are split so they add up exactly to the total.
 6. A total between 1¢ and `minChargeCents` (Stripe's 50¢ minimum) blocks checkout.
 
+## Checkout and payments
+
+1. In the cart the buyer enters name and email and presses **Continue to payment**.
+2. The server re-prices the cart, creates a pending order, and keeps the seats held for
+   `checkoutMinutes` (30, Stripe's minimum) while they pay.
+3. A $0 order is confirmed right away. Otherwise the buyer goes to Stripe's payment page.
+4. Seats are marked sold **only** when Stripe's webhook confirms payment, never when the buyer returns.
+   Then the confirmation email goes out with a QR code, and the order page shows the tickets.
+5. If payment arrives but a seat is gone (the hold ran out and someone else bought it), nothing is
+   sold, the payment is refunded automatically, the buyer is emailed, and the order is flagged for staff.
+6. If the payment page expires, the order is cancelled and the seats open up.
+
+### Turning on Stripe (test mode)
+
+1. Create a free Stripe account and stay in **Test mode**.
+2. Developers > API keys: copy the **Secret key** (`sk_test_...`) into `STRIPE_SECRET_KEY`.
+3. Developers > Webhooks > Add endpoint:
+   - URL: `https://<your site>/api/stripe/webhook`
+   - Events: `checkout.session.completed`, `checkout.session.expired`,
+     `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`
+   - Copy its **Signing secret** (`whsec_...`) into `STRIPE_WEBHOOK_SECRET`.
+4. Set `SITE_URL` to the site's address.
+5. Pay with Stripe's test card `4242 4242 4242 4242`, any future date, any CVC.
+
+To test on your own computer, the Stripe CLI can forward webhooks:
+`stripe listen --forward-to localhost:3000/api/stripe/webhook` (it prints the `whsec_...` to use).
+
+**Going live later** means swapping in the school's live keys, adding the same webhook in live
+mode, and setting `SITE_URL`. No code changes.
+
+### Testing without Stripe
+
+Set `FAKE_PAYMENTS=1` (and no `STRIPE_SECRET_KEY`). Checkout then goes to a stand-in payment
+page at `/dev/pay` with **Pay (test)**, **Back to cart**, and **Let the page expire** buttons.
+It does nothing once a Stripe key is set.
+
+### Email
+
+Set `RESEND_API_KEY` and `EMAIL_FROM` to send confirmation emails through Resend. The sending
+domain has to be verified in Resend first. Without a key, emails are printed to the server log.
+
 ## Tests
 
 ```
@@ -106,7 +147,7 @@ Set `BASE_PATH=/tickets` at build time if the app lives under another site's add
 2. Database and performances ← done
 3. Seat holds ← done
 4. Cart and server-side pricing ← done
-5. Stripe test checkout
+5. Stripe test checkout ← done
 6. Promo codes
 7. Staff area
 8. Polish and launch prep

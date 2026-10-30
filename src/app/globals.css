@@ -183,3 +183,21 @@ a { color: var(--navy); }
 .button:disabled { opacity: 0.5; cursor: not-allowed; }
 .cart-link { margin-top: 10px; }
 .cart-reminder { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+
+/* Order page */
+.qr { width: min(280px, 80vw); margin: 8px 0 24px; padding: 12px; background: var(--white); border: 1px solid var(--rule); border-radius: var(--radius); }
+.qr svg { display: block; width: 100%; height: auto; }
+.order-details { border: 1px solid var(--rule); border-radius: var(--radius); padding: 20px; max-width: 560px; }
+.order-night { border-bottom: 1px solid var(--rule); padding: 8px 0 12px; }
+.order-night h3 { margin: 4px 0; }
+.order-night p { margin: 0 0 6px; }
+.order-night ul { margin: 0; padding-left: 20px; }
+.fake-pay-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* Checkout form */
+.buyer-fields { display: grid; gap: 12px; margin-bottom: 16px; }
+.buyer-fields label { display: grid; gap: 4px; font-weight: 700; }
+.buyer-fields input { font: inherit; min-height: var(--tap); padding: 0 12px; border: 2px solid var(--rule); border-radius: 10px; color: var(--navy); }
+.buyer-fields input:focus-visible { border-color: var(--navy); }
+.buyer-fields input[aria-invalid="true"] { border-color: #b3261e; }
+.checkout-error { margin-top: 12px; }

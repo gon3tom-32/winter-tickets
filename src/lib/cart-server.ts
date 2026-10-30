@@ -16,7 +16,7 @@ export async function currentCart(): Promise<Cart | null> {
   if (!db) return null;
   const token = await readHoldToken();
   if (!token) return empty();
-  return loadCart(db, token, venue, {
+  return loadCart(db.query, token, venue, {
     multiNightPercent: pricing.multiNightDiscountPercent,
     minChargeCents: pricing.minChargeCents,
   });
