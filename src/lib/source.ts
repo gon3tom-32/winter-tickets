@@ -4,18 +4,18 @@
 import type { Performance, SeatStatus, Tier, TieredSeat } from "./types";
 import { tierFor } from "./tiers";
 import { performances, pricing, seats } from "./config";
+import type { Query } from "./db";
+export type { Query };
 
 export interface Source {
   kind: "database" | "files";
   venue(): Promise<{ seats: TieredSeat[]; tiers: Tier[] }>;
   performances(): Promise<Performance[]>;
   performance(id: string): Promise<Performance | null>;
-  /** Only seats that are not available. Missing seats are available. */
-  seatStatuses(performanceId: string): Promise<Record<string, Exclude<SeatStatus, "available">>>;
+  /** Only seats that are not available. Missing seats are available. Seats held by `myToken` are left out. */
+  seatStatuses(performanceId: string, myToken?: string | null): Promise<Record<string, Exclude<SeatStatus, "available">>>;
 }
 
-/** Runs one SQL statement with $1-style parameters and returns its rows. */
-export type Query = (text: string, params?: unknown[]) => Promise<Record<string, unknown>[]>;
 
 const toPerformance = (r: Record<string, unknown>): Performance => ({
   id: r.id as string,
@@ -53,7 +53,7 @@ export function databaseSource(query: Query): Source {
       const rows = await query(`select * from performances where id = $1`, [id]);
       return rows[0] ? toPerformance(rows[0]) : null;
     },
-    async seatStatuses(performanceId) {
+    async seatStatuses(performanceId, myToken = null) {
       // An expired hold counts as available, even before the cleanup job clears it.
       const rows = await query(
         `select seat_id,
@@ -61,8 +61,9 @@ export function databaseSource(query: Query): Source {
          from performance_seats
          where performance_id = $1
            and status <> 'available'
-           and not (status = 'held' and hold_expires_at <= now())`,
-        [performanceId],
+           and not (status = 'held' and hold_expires_at <= now())
+           and not (status = 'held' and hold_token is not distinct from $2::uuid)`,
+        [performanceId, myToken],
       );
       return Object.fromEntries(rows.map((r) => [r.seat_id as string, r.status as "held" | "sold"]));
     },

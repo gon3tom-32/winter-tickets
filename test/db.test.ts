@@ -1,21 +1,17 @@
 // Runs the real migration and seed against an in-memory Postgres (PGlite).
 import { beforeAll, describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { PGlite } from "@electric-sql/pglite";
-import { buildSeedSql } from "@/lib/seed";
+import type { PGlite } from "@electric-sql/pglite";
 import { databaseSource, type Source } from "@/lib/source";
-import { performances, pricing, seats } from "@/lib/config";
+import { performances } from "@/lib/config";
+import { freshDb, seedSql as seed } from "./helpers";
 
 let db: PGlite;
 let source: Source;
-const schema = readFileSync(new URL("../supabase/migrations/0001_schema.sql", import.meta.url), "utf8");
-const seed = buildSeedSql(seats, pricing, performances);
 
 beforeAll(async () => {
-  db = new PGlite();
-  await db.exec(schema);
-  await db.exec(seed);
-  source = databaseSource(async (text, params) => (await db.query<Record<string, unknown>>(text, params)).rows);
+  const fresh = await freshDb();
+  db = fresh.pg;
+  source = databaseSource(fresh.db.query);
 }, 30_000);
 
 const count = async (sql: string) => Number((await db.query<{ n: number }>(sql)).rows[0].n);

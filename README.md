@@ -3,7 +3,7 @@
 Reserved-seat ticketing for the Orange County Classical Academy winter performance.
 Separate from the fine arts site. The fine arts site only links here.
 
-**Status: build steps 1–2 of 8 done (seat map, database and performances).** No holds or payments yet. The seating chart, prices, and nights are placeholders.
+**Status: build steps 1–3 of 8 done (seat map, database, seat holds).** No cart or payments yet. The seating chart, prices, and nights are placeholders.
 
 ## Run it
 
@@ -50,6 +50,38 @@ or change anything. Only the app's server, through `DATABASE_URL`, can.
 **Not connected to a real Supabase project yet.** When there is one, put its connection
 string in `DATABASE_URL` (locally in `.env.local`, and in the host's environment settings) and run `db:apply`.
 
+## Seat holds
+
+When a buyer picks a seat, the server holds it for them (`holdMinutes` in `config/pricing.json`, 10 by default).
+
+- Claiming a seat is one locked database update, so two buyers can never hold the same seat.
+  The second one is told someone else is choosing it.
+- All of a buyer's seats share one countdown. It starts with the first seat; adding seats doesn't extend it.
+- The seats-per-order cap counts seats on every night.
+- Each browser is identified by a private `hold_token` cookie. A reload keeps the buyer's seats.
+- The map refreshes every 15 seconds and when the buyer returns to the tab.
+- An expired hold counts as open right away. To also tidy the table, schedule the cleanup in
+  Supabase (Database > Extensions > enable `pg_cron`, then run in the SQL editor):
+
+  ```sql
+  select cron.schedule('release-expired-holds', '*/5 * * * *', 'select release_expired_holds()');
+  ```
+
+In preview mode (no database) there are no holds; choices stay in the browser.
+
+## Tests
+
+```
+npm test
+```
+
+Database tests run on an in-memory Postgres. The many-buyers-at-once test needs a real server and
+**wipes the database it's given**, so only point it at an empty throwaway one:
+
+```
+TEST_DATABASE_URL=postgres://localhost/tickets_test npm test
+```
+
 ## Serving from a subpath
 
 Set `BASE_PATH=/tickets` at build time if the app lives under another site's address.
@@ -58,7 +90,7 @@ Set `BASE_PATH=/tickets` at build time if the app lives under another site's add
 
 1. Seat map ← done
 2. Database and performances ← done
-3. Seat holds
+3. Seat holds ← done
 4. Cart and server-side pricing
 5. Stripe test checkout
 6. Promo codes

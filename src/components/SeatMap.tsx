@@ -1,17 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import type { MapSeat, SeatStatus, Section, Tier } from "@/lib/types";
+import type { MapSeat, Section, Tier } from "@/lib/types";
 import { boundsOf, GEOMETRY, type Box } from "@/lib/layout";
 import { formatCents } from "@/lib/money";
+import { useHolds, type HoldState } from "./useHolds";
 
 type Props = {
   seats: MapSeat[];
   sections: Section[];
   tiers: Tier[];
   maxSeats: number;
-  /** Seats that can't be chosen. Seats not listed are available. */
-  statuses: Record<string, Exclude<SeatStatus, "available">>;
+  performanceId: string;
+  /** False in preview mode (no database): choices stay in the browser and nothing is held. */
+  holdsEnabled: boolean;
+  holdMinutes: number;
+  /** Seat statuses and this buyer's own holds when the page loaded. */
+  initial: HoldState;
 };
 
 const STATUS_TEXT = { held: "on hold for another buyer", sold: "taken" } as const;
@@ -20,8 +25,26 @@ type View = "all" | string;
 
 const NARROW = "(max-width: 640px)";
 
-export default function SeatMap({ seats, sections, tiers, maxSeats, statuses }: Props) {
-  const [selected, setSelected] = useState<string[]>([]);
+const PROBLEM_TEXT = {
+  held: "Sorry, someone else is choosing that seat right now. Please pick another.",
+  taken: "Sorry, that seat was just taken. Please pick another.",
+  not_on_sale: "Tickets for this night aren't on sale right now.",
+  error: "Something went wrong holding that seat. Please try again.",
+} as const;
+
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+export default function SeatMap(props: Props) {
+  const { seats, sections, tiers, maxSeats, holdsEnabled, holdMinutes } = props;
+  const [alert, setAlert] = useState("");
+  const holds = useHolds({
+    enabled: holdsEnabled,
+    performanceId: props.performanceId,
+    initial: props.initial,
+    maxSeats,
+    onExpire: () => setAlert("Your hold ran out, so your seats were released. Choose them again if they're still open."),
+  });
+  const { statuses, selected, otherNights, secondsLeft } = holds;
   const [view, setView] = useState<View>("all");
   const [focusId, setFocusId] = useState<string>(() => seats[0]?.id ?? "");
   const [message, setMessage] = useState("");
@@ -70,7 +93,12 @@ export default function SeatMap({ seats, sections, tiers, maxSeats, statuses }: 
 
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
-  function toggle(seat: MapSeat) {
+  // Two minutes left: say so once, for screen reader users too.
+  useEffect(() => {
+    if (secondsLeft === 120) setMessage("Two minutes left to finish choosing seats before they're released.");
+  }, [secondsLeft]);
+
+  async function toggle(seat: MapSeat) {
     const status = statuses[seat.id];
     if (status && !selectedSet.has(seat.id)) {
       setMessage(`${seat.label} is ${STATUS_TEXT[status]}.`);
@@ -78,16 +106,19 @@ export default function SeatMap({ seats, sections, tiers, maxSeats, statuses }: 
     }
     const tier = tierById.get(seat.tier)!;
     if (selectedSet.has(seat.id)) {
-      setSelected((cur) => cur.filter((id) => id !== seat.id));
+      holds.remove([seat.id]);
       setMessage(`Removed ${seat.label}.`);
       return;
     }
-    if (selected.length >= maxSeats) {
-      setMessage(`You can choose up to ${maxSeats} seats per order.`);
-      return;
+    const result = await holds.add(seat.id);
+    if (result === "ok") {
+      setAlert("");
+      setMessage(`Added ${seat.label}, ${tier.name}, ${formatCents(seat.priceCents)}.`);
+    } else if (result === "limit") {
+      setAlert(`You can choose up to ${maxSeats} seats per order${otherNights ? ", counting seats on other nights" : ""}.`);
+    } else {
+      setAlert(PROBLEM_TEXT[result]);
     }
-    setSelected((cur) => [...cur, seat.id]);
-    setMessage(`Added ${seat.label}, ${tier.name}, ${formatCents(seat.priceCents)}.`);
   }
 
   function onSeatClick(seat: MapSeat) {
@@ -258,8 +289,16 @@ export default function SeatMap({ seats, sections, tiers, maxSeats, statuses }: 
 
       <section className="summary" id="your-seats" aria-labelledby="your-seats-heading">
         <h2 id="your-seats-heading">Your seats</h2>
+        {otherNights > 0 && (
+          <p className="small">
+            You also have {otherNights} {otherNights === 1 ? "seat" : "seats"} held for other nights.
+          </p>
+        )}
         {chosen.length === 0 ? (
-          <p className="muted">No seats chosen yet. You can choose up to {maxSeats}.</p>
+          <p className="muted">
+            No seats chosen yet. You can choose up to {maxSeats}.
+            {holdsEnabled && ` We'll hold your seats for ${holdMinutes} minutes while you finish.`}
+          </p>
         ) : (
           <>
             <ul className="chosen">
@@ -273,7 +312,7 @@ export default function SeatMap({ seats, sections, tiers, maxSeats, statuses }: 
                         {tier.name} · {formatCents(s.priceCents)}
                       </span>
                     </span>
-                    <button type="button" className="remove" onClick={() => toggle(s)} aria-label={`Remove ${s.label}`}>
+                    <button type="button" className="remove" onClick={() => { holds.remove([s.id]); setMessage(`Removed ${s.label}.`); }} aria-label={`Remove ${s.label}`}>
                       Remove
                     </button>
                   </li>
@@ -287,7 +326,12 @@ export default function SeatMap({ seats, sections, tiers, maxSeats, statuses }: 
               <strong>{formatCents(subtotal)}</strong>
             </p>
             <p className="muted small">Before discounts. Buying for 2 or more nights in one order takes 20% off.</p>
-            <button type="button" className="button secondary" onClick={() => { setSelected([]); setMessage("Cleared all seats."); }}>
+            {holdsEnabled && secondsLeft !== null && (
+              <p className={`hold-timer${secondsLeft <= 120 ? " ending" : ""}`}>
+                Held for you for <strong>{clock(secondsLeft)}</strong>
+              </p>
+            )}
+            <button type="button" className="button secondary" onClick={() => { holds.remove(); setMessage("Cleared all seats."); }}>
               Clear seats
             </button>
           </>
@@ -304,7 +348,16 @@ export default function SeatMap({ seats, sections, tiers, maxSeats, statuses }: 
       )}
 
       <p className="sr-only" aria-live="polite">{message}</p>
-      {message.startsWith("You can choose up to") && <p className="notice" role="alert">{message}</p>}
+      <div className="toast-region" role="alert">
+        {alert && (
+          <p className="notice toast">
+            <span>{alert}</span>
+            <button type="button" className="toast-close" onClick={() => setAlert("")} aria-label="Dismiss message">
+              ✕
+            </button>
+          </p>
+        )}
+      </div>
     </div>
   );
 }

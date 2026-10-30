@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import SeatMap from "@/components/SeatMap";
 import { buildMap } from "@/lib/layout";
 import { venue, pricing } from "@/lib/config";
-import { getSource } from "@/lib/server-source";
+import { getDb, getSource } from "@/lib/server-source";
+import { myHolds, splitHolds } from "@/lib/holds";
+import { readHoldToken } from "@/lib/hold-cookie";
 import { nightTitle } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +16,13 @@ export default async function Night({ params }: { params: Promise<{ id: string }
   const night = await source.performance(id);
   if (!night) notFound();
 
-  const [{ seats, tiers }, statuses] = await Promise.all([source.venue(), source.seatStatuses(id)]);
+  const db = getDb();
+  const token = await readHoldToken();
+  const [{ seats, tiers }, statuses, mine] = await Promise.all([
+    source.venue(),
+    source.seatStatuses(id, token),
+    db && token ? myHolds(db, token) : { seats: [], expiresAt: null },
+  ]);
 
   return (
     <div className="wrap page">
@@ -29,7 +37,10 @@ export default async function Night({ params }: { params: Promise<{ id: string }
           sections={venue.sections}
           tiers={tiers}
           maxSeats={pricing.maxSeatsPerOrder}
-          statuses={statuses}
+          performanceId={night.id}
+          holdsEnabled={db !== null}
+          holdMinutes={pricing.holdMinutes}
+          initial={{ statuses, ...splitHolds(mine, night.id) }}
         />
       ) : (
         <p className="notice">Tickets for this night aren&apos;t on sale yet.</p>
