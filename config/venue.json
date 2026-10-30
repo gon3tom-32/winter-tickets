@@ -1,0 +1,14 @@
+{
+  "_note": "PLACEHOLDER layout until the real seating chart arrives. Rows are listed front to back. After editing, run: npm run seats",
+  "name": "[Venue name]",
+  "sections": [
+    { "id": "L", "name": "Left" },
+    { "id": "C", "name": "Center" },
+    { "id": "R", "name": "Right" }
+  ],
+  "zones": [
+    { "id": "front", "name": "Front", "rows": ["A", "B", "C", "D", "E"] },
+    { "id": "back", "name": "Back", "rows": ["F", "G", "H", "I", "J"] }
+  ],
+  "seatsPerRow": 10
+}

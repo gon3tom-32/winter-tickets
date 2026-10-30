@@ -1,0 +1,132 @@
+/* School colors: white base, navy for text and buttons, orange accent.
+   Kept as variables so they are easy to swap. */
+:root {
+  --white: #ffffff;
+  --navy: #14305e;
+  --navy-light: #24467f;
+  --orange: #f47b20;
+  --wash: #f2f5fa;
+  --rule: #e1e6f0;
+  --muted: #4a5875;
+
+  /* Seat tier colors. Each passes 3:1 contrast on white; tier names are
+     always written out too, so color is never the only signal. */
+  --tier-premium: #14305e;
+  --tier-standard: #c4540a;
+  --tier-value: #2f6fb8;
+  --tier-other: #5b6b86;
+
+  --font-heading: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+  --radius: 16px;
+  --tap: 44px;
+  --gutter: 16px;
+  --max: 1120px;
+  --focus: 3px solid var(--orange);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--white);
+  color: var(--navy);
+  font-family: var(--font-body);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+}
+h1, h2 { font-family: var(--font-heading); font-weight: 700; line-height: 1.15; margin: 0 0 0.4em; }
+h1 { font-size: clamp(1.9rem, 6vw, 2.8rem); letter-spacing: -0.01em; }
+h2 { font-size: 1.35rem; }
+p { margin: 0 0 1em; }
+a { color: var(--navy); }
+:focus-visible { outline: var(--focus); outline-offset: 3px; border-radius: 4px; }
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 var(--gutter); }
+.muted { color: var(--muted); }
+.small { font-size: 0.9rem; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.skip-link {
+  position: absolute; left: var(--gutter); top: -100px; z-index: 10;
+  background: var(--navy); color: var(--white); padding: 10px 16px; border-radius: 999px;
+}
+.skip-link:focus { top: 12px; }
+
+/* Header, banner, footer */
+.site-header { border-bottom: 1px solid var(--rule); }
+.header-inner { display: flex; align-items: center; gap: 16px; min-height: 68px; flex-wrap: wrap; }
+.logo { height: 40px; width: auto; }
+.header-title { font-family: var(--font-heading); font-weight: 700; font-size: 1.05rem; }
+.preview-banner { background: var(--orange); color: var(--navy); font-weight: 500; font-size: 0.95rem; padding: 8px 0; }
+.site-footer { background: var(--wash); padding: 24px 0 96px; margin-top: 48px; font-size: 0.95rem; }
+
+.page { padding-top: 28px; }
+.eyebrow { font-weight: 700; margin-bottom: 4px; }
+.lede { max-width: 60ch; }
+
+/* Buttons */
+.button, .view-buttons button, .remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--tap); padding: 0 20px; border-radius: 999px;
+  font: inherit; font-weight: 700; cursor: pointer; text-decoration: none;
+  border: 2px solid var(--navy);
+}
+.button { background: var(--navy); color: var(--white); }
+.button.secondary, .remove { background: var(--white); color: var(--navy); }
+.remove { padding: 0 14px; font-size: 0.9rem; flex-shrink: 0; }
+
+/* Layout: map beside the summary on wide screens, stacked on phones */
+.seatmap { display: grid; gap: 24px; margin-top: 20px; }
+@media (min-width: 900px) {
+  .seatmap { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+  .summary { position: sticky; top: 16px; }
+}
+
+.view-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.view-buttons button { background: var(--white); color: var(--navy); padding: 0 18px; }
+.view-buttons button[aria-pressed="true"] { background: var(--navy); color: var(--white); }
+
+.legend { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.95rem; }
+.legend li { display: inline-flex; align-items: center; gap: 6px; }
+.hint { font-weight: 500; background: var(--wash); border-radius: 10px; padding: 10px 14px; }
+
+.map-frame { background: var(--wash); border-radius: var(--radius); padding: 8px; }
+.map { display: block; width: 100%; height: auto; max-height: 72vh; touch-action: manipulation; }
+
+/* Seats */
+.dot { fill: var(--tier-other); }
+.dot[data-tier="premium"] { fill: var(--tier-premium); }
+.dot[data-tier="standard"] { fill: var(--tier-standard); }
+.dot[data-tier="value"] { fill: var(--tier-value); }
+.dot.selected-dot { fill: var(--white); stroke: var(--navy); stroke-width: 2.5; }
+.check { fill: none; stroke: var(--navy); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.legend .check { stroke-width: 2; }
+.hit { fill: transparent; }
+.ring { fill: none; stroke: transparent; stroke-width: 2.5; }
+.seat { cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; }
+.seat:hover .dot:not(.selected-dot) { opacity: 0.75; }
+.seat:focus-visible .ring { stroke: var(--orange); }
+
+.stage { fill: var(--navy); }
+.stage-label { fill: var(--white); font-family: var(--font-heading); font-size: 18px; font-weight: 700; letter-spacing: 0.2em; }
+.stage-arrow { fill: var(--muted); font-size: 13px; font-weight: 700; }
+
+/* Summary */
+.summary { border: 1px solid var(--rule); border-radius: var(--radius); padding: 20px; scroll-margin-top: 16px; }
+.chosen { list-style: none; padding: 0; margin: 0 0 12px; }
+.chosen li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.chosen li > span { display: flex; flex-direction: column; font-size: 0.95rem; }
+.subtotal { display: flex; justify-content: space-between; font-size: 1.15rem; margin: 8px 0 4px; }
+
+.notice { background: #fde6d2; color: #8a3a00; border-radius: 10px; padding: 10px 14px; font-weight: 500; }
+
+/* Phone: a bar pinned to the bottom with the running total */
+.sticky-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 10px var(--gutter) calc(10px + env(safe-area-inset-bottom));
+  background: var(--white); border-top: 1px solid var(--rule); box-shadow: 0 -4px 16px rgb(20 48 94 / 0.08);
+}
+@media (min-width: 900px) { .sticky-bar { display: none; } }

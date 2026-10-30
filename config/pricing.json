@@ -1,0 +1,17 @@
+{
+  "_note": "PLACEHOLDER prices until the school decides. Tier rules are checked top to bottom; the first match wins. A rule can name a section, a zone, and/or a list of rows.",
+  "tiers": [
+    { "id": "premium", "name": "Premium", "priceCents": 1200 },
+    { "id": "standard", "name": "Standard", "priceCents": 1000 },
+    { "id": "value", "name": "Value", "priceCents": 800 }
+  ],
+  "tierRules": [
+    { "section": "C", "zone": "front", "tier": "premium" },
+    { "section": "C", "zone": "back", "tier": "standard" },
+    { "zone": "front", "tier": "standard" },
+    { "zone": "back", "tier": "value" }
+  ],
+  "multiNightDiscountPercent": 20,
+  "maxSeatsPerOrder": 10,
+  "holdMinutes": 10
+}
