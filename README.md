@@ -47,8 +47,15 @@ Running the seed again updates seats, prices, and nights but never resets seats 
 Every table has row level security on with no policies, so Supabase's public API keys can't read
 or change anything. Only the app's server, through `DATABASE_URL`, can.
 
-**Not connected to a real Supabase project yet.** When there is one, put its connection
-string in `DATABASE_URL` (locally in `.env.local`, and in the host's environment settings) and run `db:apply`.
+**Supabase project:** `winter-tickets` (ref `wvykjbwyddldmyaqfyfo`, region us-west-1). All migrations
+and the seed are loaded, and the expired-hold cleanup runs every 5 minutes there (pg_cron).
+
+To connect the app, get the connection string from the Supabase dashboard: open the project, press
+**Connect**, choose **Transaction pooler**, and copy the URI. Put your database password in it (reset it
+under Project Settings > Database if you don't have it). Use that as `DATABASE_URL` locally in
+`.env.local` and in the hosting site's environment settings. Never commit it.
+
+Future migrations: `DATABASE_URL=... npm run db:apply` applies only the new ones (it tracks them in `app_migrations`).
 
 ## Seat holds
 
@@ -60,11 +67,12 @@ When a buyer picks a seat, the server holds it for them (`holdMinutes` in `confi
 - The seats-per-order cap counts seats on every night.
 - Each browser is identified by a private `hold_token` cookie. A reload keeps the buyer's seats.
 - The map refreshes every 15 seconds and when the buyer returns to the tab.
-- An expired hold counts as open right away. To also tidy the table, schedule the cleanup in
-  Supabase (Database > Extensions > enable `pg_cron`, then run in the SQL editor):
+- An expired hold counts as open right away. The cleanup below tidies the table; it's already
+  scheduled on the winter-tickets Supabase project. For a new project, enable `pg_cron`
+  (Database > Extensions), then run in the SQL editor:
 
   ```sql
-  select cron.schedule('release-expired-holds', '*/5 * * * *', 'select release_expired_holds()');
+  select cron.schedule('release-expired-holds', '*/5 * * * *', 'select public.release_expired_holds()');
   ```
 
 In preview mode (no database) there are no holds; choices stay in the browser.
