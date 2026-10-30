@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "db:seed": "tsx scripts/build-seed.ts",
     "db:apply": "tsx scripts/db-apply.ts",
-    "promo:create": "tsx scripts/create-promo.ts"
+    "promo:create": "tsx scripts/create-promo.ts",
+    "staff:add": "tsx scripts/add-staff.ts"
   },
   "dependencies": {
     "next": "^15.5.28",

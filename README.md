@@ -3,7 +3,7 @@
 Reserved-seat ticketing for the Orange County Classical Academy winter performance.
 Separate from the fine arts site. The fine arts site only links here.
 
-**Status: build steps 1–6 of 8 done (seat map, database, seat holds, cart and pricing, checkout, promo codes).** Payments run in Stripe test mode once keys are added. The seating chart, prices, and nights are placeholders.
+**Status: build steps 1–7 of 8 done (seat map, database, seat holds, cart and pricing, checkout, promo codes, staff area).** Payments run in Stripe test mode once keys are added. The seating chart, prices, and nights are placeholders.
 
 ## Run it
 
@@ -112,8 +112,8 @@ Prices are always worked out on the server (`src/lib/pricing.ts`), in this order
 **Assumptions to confirm:** dollar codes are per seat (not per order), and the balance runs across
 orders (from the spec's open items).
 
-Until the staff area exists (step 7), create codes from the command line. Every code created is
-written to the audit log.
+Staff create codes in the staff area (`/staff/codes`). The command line also works. Every code
+created is written to the audit log.
 
 ```
 DATABASE_URL=... npm run promo:create -- WINTER percent 50 --seats 2
@@ -149,6 +149,47 @@ It does nothing once a Stripe key is set.
 Set `RESEND_API_KEY` and `EMAIL_FROM` to send confirmation emails through Resend. The sending
 domain has to be verified in Resend first. Without a key, emails are printed to the server log.
 
+## Staff area (`/staff`)
+
+**Signing in.** Staff enter their email and get a one-time sign-in link (expires in 15 minutes,
+works once, at most one per minute). The link opens a page with a **Sign in** button rather than
+signing in on its own, because some email programs open links to check them. Sessions last 12 hours.
+Links and session cookies are stored only as hashes. Without `RESEND_API_KEY`, the link is printed
+to the server log, which is how to sign in while testing.
+
+This doesn't use Supabase Auth. It works on any Postgres and only needs the same email service
+as the tickets.
+
+**First admin.** Add the first admin from the command line; after that, admins add staff on the Staff page:
+
+```
+DATABASE_URL=... npm run staff:add -- teacher@school.org --admin
+```
+
+**What's there:**
+
+| Page | What it does |
+|---|---|
+| Nights | Each night: seats taken, in checkout, and open |
+| Seat ledger (per night) | Paid, discounted with a code, free with a code, comped, held in checkout, available. Always adds up to the seat count, with a warning if not. Seats by grade supported, and a list of who's coming |
+| Comp seats | Pick seats on the map, enter who they're for, the grade, and why |
+| Promo codes | Create codes, turn them off, raise limits |
+| Flagged orders | Orders a person should look at (such as automatic refunds), with a note when handled |
+| Audit log | Every comp, code change, staff change, and sign-in. Can't be edited or deleted |
+| Staff (admins) | Add staff, change roles, turn accounts off (which also signs them out) |
+
+**Roles:**
+
+| Action | Staff | Admin |
+|---|---|---|
+| Comp seats | Yes | Yes |
+| Create percent or dollar codes | Yes | Yes |
+| Create codes that make seats free (100%, or dollars off the full price) | No | Yes |
+| Raise a code's seat limit | No | Yes |
+| Turn codes off | Yes | Yes |
+| Undo a comp | No | Yes |
+| Manage staff | No | Yes |
+
 ## Tests
 
 ```
@@ -174,5 +215,5 @@ Set `BASE_PATH=/tickets` at build time if the app lives under another site's add
 4. Cart and server-side pricing ← done
 5. Stripe test checkout ← done
 6. Promo codes ← done
-7. Staff area
+7. Staff area ← done
 8. Polish and launch prep

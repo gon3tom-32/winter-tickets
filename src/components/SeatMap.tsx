@@ -19,6 +19,8 @@ type Props = {
   holdMinutes: number;
   /** Seat statuses and this buyer's own holds when the page loaded. */
   initial: HoldState;
+  /** Staff mode (comps): replaces the buyer's cart parts with this, given the chosen seat ids. */
+  staffActions?: (selectedIds: string[]) => React.ReactNode;
 };
 
 const STATUS_TEXT = { held: "on hold for another buyer", sold: "taken" } as const;
@@ -36,7 +38,7 @@ const PROBLEM_TEXT = {
 
 
 export default function SeatMap(props: Props) {
-  const { seats, sections, tiers, maxSeats, holdsEnabled, holdMinutes } = props;
+  const { seats, sections, tiers, maxSeats, holdsEnabled, holdMinutes, staffActions } = props;
   const [alert, setAlert] = useState("");
   const holds = useHolds({
     enabled: holdsEnabled,
@@ -289,7 +291,7 @@ export default function SeatMap(props: Props) {
       </div>
 
       <section className="summary" id="your-seats" aria-labelledby="your-seats-heading">
-        <h2 id="your-seats-heading">Your seats</h2>
+        <h2 id="your-seats-heading">{staffActions ? "Seats to comp" : "Your seats"}</h2>
         {otherNights > 0 && (
           <p className="small">
             You also have {otherNights} {otherNights === 1 ? "seat" : "seats"} held for other nights.
@@ -298,7 +300,7 @@ export default function SeatMap(props: Props) {
         {chosen.length === 0 ? (
           <>
             <p className="muted">
-              No seats chosen yet. You can choose up to {maxSeats}.
+              No seats chosen yet.{!staffActions && ` You can choose up to ${maxSeats}.`}
               {holdsEnabled && ` We'll hold your seats for ${holdMinutes} minutes while you finish.`}
             </p>
             {otherNights > 0 && (
@@ -333,11 +335,11 @@ export default function SeatMap(props: Props) {
               </span>
               <strong>{formatCents(subtotal)}</strong>
             </p>
-            <p className="muted small">
+            {!staffActions && <p className="muted small">
               {otherNights > 0
                 ? "Before discounts. Your seats on other nights mean the multi-night discount applies; see the cart."
                 : "Before discounts. Buying for 2 or more nights in one order takes 20% off."}
-            </p>
+            </p>}
             {holdsEnabled && secondsLeft !== null && (
               <p className={`hold-timer${secondsLeft <= 120 ? " ending" : ""}`}>
                 Held for you for <strong>{clock(secondsLeft)}</strong>
@@ -346,6 +348,7 @@ export default function SeatMap(props: Props) {
             <button type="button" className="button secondary" onClick={() => { holds.remove(); setMessage("Cleared all seats."); }}>
               Clear seats
             </button>
+            {staffActions?.(chosen.map((c) => c.id))}
             {holdsEnabled && (
               <Link href="/cart" className="button wide cart-link">
                 Review cart
@@ -355,7 +358,7 @@ export default function SeatMap(props: Props) {
         )}
       </section>
 
-      {chosen.length + otherNights > 0 && (
+      {!staffActions && chosen.length + otherNights > 0 && (
         <div className="sticky-bar">
           <span>
             {chosen.length > 0 ? (
