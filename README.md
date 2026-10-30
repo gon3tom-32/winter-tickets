@@ -3,7 +3,7 @@
 Reserved-seat ticketing for the Orange County Classical Academy winter performance.
 Separate from the fine arts site. The fine arts site only links here.
 
-**Status: build steps 1–3 of 8 done (seat map, database, seat holds).** No cart or payments yet. The seating chart, prices, and nights are placeholders.
+**Status: build steps 1–4 of 8 done (seat map, database, seat holds, cart and pricing).** No payments yet. The seating chart, prices, and nights are placeholders.
 
 ## Run it
 
@@ -69,6 +69,20 @@ When a buyer picks a seat, the server holds it for them (`holdMinutes` in `confi
 
 In preview mode (no database) there are no holds; choices stay in the browser.
 
+## Cart and pricing
+
+The cart (`/cart`) lists every seat the buyer holds, grouped by night. For each night the buyer
+must pick at least one grade they're supporting, from that night's grades.
+
+Prices are always worked out on the server (`src/lib/pricing.ts`), in this order:
+
+1. Each seat at its tier price, in cents (read from the database, so a price change shows up at once).
+2. Seats on 2 or more nights in one order: `multiNightDiscountPercent` off every seat. A third night adds nothing.
+3. A promo code's discount on the same seats (step 6).
+4. Whichever discount is better for the buyer. They never combine.
+5. Round once, at the end. Per-seat prices are split so they add up exactly to the total.
+6. A total between 1¢ and `minChargeCents` (Stripe's 50¢ minimum) blocks checkout.
+
 ## Tests
 
 ```
@@ -91,7 +105,7 @@ Set `BASE_PATH=/tickets` at build time if the app lives under another site's add
 1. Seat map ← done
 2. Database and performances ← done
 3. Seat holds ← done
-4. Cart and server-side pricing
+4. Cart and server-side pricing ← done
 5. Stripe test checkout
 6. Promo codes
 7. Staff area
