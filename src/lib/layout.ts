@@ -21,8 +21,6 @@ const rad = (deg: number) => (deg * Math.PI) / 180;
 export function buildMap(seats: TieredSeat[], venue: Venue, tiers: Tier[]): MapSeat[] {
   const g = GEOMETRY;
   const sectionOrder = venue.sections.map((s) => s.id);
-  const sectionName = new Map(venue.sections.map((s) => [s.id, s.name]));
-  const zoneName = new Map(venue.zones.map((z) => [z.id, z.name]));
   const tierById = new Map(tiers.map((t) => [t.id, t]));
 
   // Front-to-back row order, with the zone each row starts in.
@@ -63,11 +61,18 @@ export function buildMap(seats: TieredSeat[], venue: Venue, tiers: Tier[]): MapS
         x: Math.round(radius * Math.sin(angle) * 10) / 10,
         y: Math.round(radius * Math.cos(angle) * 10) / 10,
         rowIndex,
-        label: `${sectionName.get(seat.section)} ${zoneName.get(seat.zone) ?? seat.zone}, Row ${seat.row}, Seat ${seat.number}`,
+        label: seatLabel(seat, venue),
       });
     });
   }
   return out;
+}
+
+/** "Center Front, Row C, Seat 5" */
+export function seatLabel(seat: { section: string; zone: string; row: string; number: number }, venue: Venue): string {
+  const section = venue.sections.find((s) => s.id === seat.section)?.name ?? seat.section;
+  const zone = venue.zones.find((z) => z.id === seat.zone)?.name ?? seat.zone;
+  return `${section} ${zone}, Row ${seat.row}, Seat ${seat.number}`;
 }
 
 export type Box = { x: number; y: number; w: number; h: number };

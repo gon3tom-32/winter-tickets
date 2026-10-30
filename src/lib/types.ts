@@ -17,6 +17,8 @@ export type Pricing = {
   tiers: Tier[];
   tierRules: TierRule[];
   multiNightDiscountPercent: number;
+  /** Smallest card charge allowed, in cents (Stripe: 50). */
+  minChargeCents: number;
   maxSeatsPerOrder: number;
   holdMinutes: number;
 };

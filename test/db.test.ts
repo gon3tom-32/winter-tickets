@@ -129,3 +129,13 @@ describe("database source", () => {
     expect(tiers.map((t) => t.priceCents)).toEqual([1200, 1000, 800]);
   });
 });
+
+describe("grades on order items", () => {
+  it("stores a list and requires at least one grade", async () => {
+    const [o] = (await db.query<{ id: string }>(`insert into orders (buyer_name, buyer_email, total_cents) values ('[T]', 't@example.com', 0) returning id`)).rows;
+    await db.query(`insert into order_items (order_id, performance_id, seat_id, price_cents, grades_supported) values ($1, 'night-1', 'C-A-9', 960, array['[Grade A]', '[Grade B]'])`, [o.id]);
+    await expect(
+      db.query(`insert into order_items (order_id, performance_id, seat_id, price_cents, grades_supported) values ($1, 'night-1', 'C-A-8', 960, '{}')`, [o.id]),
+    ).rejects.toThrow(/check constraint/);
+  });
+});

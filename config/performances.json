@@ -1,8 +1,35 @@
 {
   "_note": "PLACEHOLDER nights until the school sets the schedule. startsAt is an ISO date-time like \"2026-12-10T18:30:00-08:00\", or null while unknown. After editing, run: npm run db:seed",
   "performances": [
-    { "id": "night-1", "label": "[Night 1: day and date]", "startsAt": null, "grades": ["[Grade]", "[Grade]"], "onSale": true },
-    { "id": "night-2", "label": "[Night 2: day and date]", "startsAt": null, "grades": ["[Grade]", "[Grade]"], "onSale": true },
-    { "id": "night-3", "label": "[Night 3: day and date]", "startsAt": null, "grades": ["[Grade]", "[Grade]"], "onSale": true }
+    {
+      "id": "night-1",
+      "label": "[Night 1: day and date]",
+      "startsAt": null,
+      "grades": [
+        "[Grade A]",
+        "[Grade B]"
+      ],
+      "onSale": true
+    },
+    {
+      "id": "night-2",
+      "label": "[Night 2: day and date]",
+      "startsAt": null,
+      "grades": [
+        "[Grade C]",
+        "[Grade D]"
+      ],
+      "onSale": true
+    },
+    {
+      "id": "night-3",
+      "label": "[Night 3: day and date]",
+      "startsAt": null,
+      "grades": [
+        "[Grade E]",
+        "[Grade F]"
+      ],
+      "onSale": true
+    }
   ]
 }

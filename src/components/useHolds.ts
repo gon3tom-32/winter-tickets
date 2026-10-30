@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SeatStatus } from "@/lib/types";
 import { asset } from "@/lib/asset";
+import { useCountdown } from "./useCountdown";
 
 export type Statuses = Record<string, Exclude<SeatStatus, "available">>;
 
@@ -31,7 +32,6 @@ export function useHolds(opts: {
   const [selected, setSelected] = useState<string[]>(opts.initial.mine);
   const [otherNights, setOtherNights] = useState(opts.initial.otherNights);
   const [expiresAt, setExpiresAt] = useState<string | null>(opts.initial.expiresAt);
-  const [now, setNow] = useState(() => Date.now());
   // While a hold or release is on its way, skip refreshes so they can't undo it on screen.
   const pending = useRef(0);
   const onExpire = useRef(opts.onExpire);
@@ -65,22 +65,13 @@ export function useHolds(opts: {
   }, [enabled, refresh]);
 
   // Countdown. When the hold runs out, the seats go back to everyone.
-  useEffect(() => {
-    if (!expiresAt) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [expiresAt]);
-
-  const secondsLeft = expiresAt ? Math.max(0, Math.ceil((Date.parse(expiresAt) - now) / 1000)) : null;
-
-  useEffect(() => {
-    if (secondsLeft !== 0) return;
+  const secondsLeft = useCountdown(expiresAt, () => {
     setSelected([]);
     setOtherNights(0);
     setExpiresAt(null);
     onExpire.current();
     refresh();
-  }, [secondsLeft, refresh]);
+  });
 
   async function add(seatId: string): Promise<AddResult> {
     if (selected.length + otherNights >= maxSeats) return "limit";
@@ -96,7 +87,6 @@ export function useHolds(opts: {
       });
       const data = await res.json();
       if (data.ok) {
-        setNow(Date.now());
         setExpiresAt(data.expiresAt);
         return "ok";
       }

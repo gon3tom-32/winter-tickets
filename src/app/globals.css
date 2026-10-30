@@ -156,3 +156,30 @@ a { color: var(--navy); }
 @media (min-width: 900px) { .toast-region { bottom: 24px; } }
 .toast { pointer-events: auto; display: flex; align-items: center; gap: 8px; margin: 0; max-width: 520px; box-shadow: 0 6px 24px rgb(20 48 94 / 0.18); }
 .toast-close { flex-shrink: 0; min-width: var(--tap); min-height: var(--tap); border: 0; background: transparent; color: inherit; font-size: 1.1rem; cursor: pointer; border-radius: 999px; }
+
+/* Cart */
+.cart { display: grid; gap: 24px; margin-top: 12px; }
+@media (min-width: 900px) {
+  .cart { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+  .cart-summary { position: sticky; top: 16px; }
+}
+.cart-night { border: 1px solid var(--rule); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.text-link { display: inline-flex; align-items: center; min-height: var(--tap); font-weight: 500; }
+.grades { border: 0; padding: 0; margin: 12px 0 0; }
+.grades legend { font-weight: 700; padding: 0; margin-bottom: 8px; }
+.grade-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.grade-option { display: inline-flex; align-items: center; gap: 10px; min-height: var(--tap); padding: 0 16px; border: 2px solid var(--rule); border-radius: 999px; cursor: pointer; font-weight: 500; }
+.grade-option:has(input:checked) { border-color: var(--navy); background: var(--wash); }
+.grade-option input { width: 20px; height: 20px; accent-color: var(--navy); margin: 0; }
+.grades.has-error .grade-option { border-color: #b3261e; }
+.field-error { color: #b3261e; font-weight: 700; margin: 0 0 8px; }
+.tip { background: var(--wash); border-radius: 10px; padding: 12px 16px; }
+.totals { margin: 0 0 16px; }
+.totals div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; }
+.totals dt, .totals dd { margin: 0; }
+.totals .discount { color: #1f6b3a; font-weight: 700; }
+.totals .grand { border-top: 1px solid var(--rule); margin-top: 6px; padding-top: 10px; font-size: 1.25rem; font-weight: 700; }
+.button.wide { width: 100%; }
+.button:disabled { opacity: 0.5; cursor: not-allowed; }
+.cart-link { margin-top: 10px; }
+.cart-reminder { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }

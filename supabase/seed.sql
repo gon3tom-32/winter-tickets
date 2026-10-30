@@ -312,9 +312,9 @@ on conflict (id) do update set section = excluded.section, zone = excluded.zone,
   number = excluded.number, tier_id = excluded.tier_id, accessible = excluded.accessible;
 
 insert into performances (id, label, starts_at, grades, on_sale, sort) values
-  ('night-1', '[Night 1: day and date]', null, array['[Grade]', '[Grade]']::text[], true, 0),
-  ('night-2', '[Night 2: day and date]', null, array['[Grade]', '[Grade]']::text[], true, 1),
-  ('night-3', '[Night 3: day and date]', null, array['[Grade]', '[Grade]']::text[], true, 2)
+  ('night-1', '[Night 1: day and date]', null, array['[Grade A]', '[Grade B]']::text[], true, 0),
+  ('night-2', '[Night 2: day and date]', null, array['[Grade C]', '[Grade D]']::text[], true, 1),
+  ('night-3', '[Night 3: day and date]', null, array['[Grade E]', '[Grade F]']::text[], true, 2)
 on conflict (id) do update set label = excluded.label, starts_at = excluded.starts_at,
   grades = excluded.grades, on_sale = excluded.on_sale, sort = excluded.sort;
 

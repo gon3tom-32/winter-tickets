@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import Link from "next/link";
 import type { MapSeat, Section, Tier } from "@/lib/types";
 import { boundsOf, GEOMETRY, type Box } from "@/lib/layout";
 import { formatCents } from "@/lib/money";
 import { useHolds, type HoldState } from "./useHolds";
+import { clock } from "./useCountdown";
 
 type Props = {
   seats: MapSeat[];
@@ -32,7 +34,6 @@ const PROBLEM_TEXT = {
   error: "Something went wrong holding that seat. Please try again.",
 } as const;
 
-const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 export default function SeatMap(props: Props) {
   const { seats, sections, tiers, maxSeats, holdsEnabled, holdMinutes } = props;
@@ -295,10 +296,17 @@ export default function SeatMap(props: Props) {
           </p>
         )}
         {chosen.length === 0 ? (
-          <p className="muted">
-            No seats chosen yet. You can choose up to {maxSeats}.
-            {holdsEnabled && ` We'll hold your seats for ${holdMinutes} minutes while you finish.`}
-          </p>
+          <>
+            <p className="muted">
+              No seats chosen yet. You can choose up to {maxSeats}.
+              {holdsEnabled && ` We'll hold your seats for ${holdMinutes} minutes while you finish.`}
+            </p>
+            {otherNights > 0 && (
+              <Link href="/cart" className="button wide cart-link">
+                Review cart
+              </Link>
+            )}
+          </>
         ) : (
           <>
             <ul className="chosen">
@@ -325,7 +333,11 @@ export default function SeatMap(props: Props) {
               </span>
               <strong>{formatCents(subtotal)}</strong>
             </p>
-            <p className="muted small">Before discounts. Buying for 2 or more nights in one order takes 20% off.</p>
+            <p className="muted small">
+              {otherNights > 0
+                ? "Before discounts. Your seats on other nights mean the multi-night discount applies; see the cart."
+                : "Before discounts. Buying for 2 or more nights in one order takes 20% off."}
+            </p>
             {holdsEnabled && secondsLeft !== null && (
               <p className={`hold-timer${secondsLeft <= 120 ? " ending" : ""}`}>
                 Held for you for <strong>{clock(secondsLeft)}</strong>
@@ -334,16 +346,31 @@ export default function SeatMap(props: Props) {
             <button type="button" className="button secondary" onClick={() => { holds.remove(); setMessage("Cleared all seats."); }}>
               Clear seats
             </button>
+            {holdsEnabled && (
+              <Link href="/cart" className="button wide cart-link">
+                Review cart
+              </Link>
+            )}
           </>
         )}
       </section>
 
-      {chosen.length > 0 && (
+      {chosen.length + otherNights > 0 && (
         <div className="sticky-bar">
           <span>
-            {chosen.length} {chosen.length === 1 ? "seat" : "seats"} · <strong>{formatCents(subtotal)}</strong>
+            {chosen.length > 0 ? (
+              <>
+                {chosen.length} {chosen.length === 1 ? "seat" : "seats"} · <strong>{formatCents(subtotal)}</strong>
+              </>
+            ) : (
+              `${otherNights} ${otherNights === 1 ? "seat" : "seats"} on other nights`
+            )}
           </span>
-          <a href="#your-seats" className="button">Review</a>
+          {holdsEnabled ? (
+            <Link href="/cart" className="button">Review cart</Link>
+          ) : (
+            <a href="#your-seats" className="button">Review</a>
+          )}
         </div>
       )}
 
