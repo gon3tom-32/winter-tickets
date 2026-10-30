@@ -12,7 +12,8 @@ export function getDb(): Db | null {
   const url = process.env.DATABASE_URL;
   if (!url) return (db = null);
   // prepare: false is needed for Supabase's connection pooler.
-  const sql = postgres(url, { prepare: false, max: 5, onnotice: () => {} });
+  // On Netlify each function instance keeps a small pool and lets idle connections go.
+  const sql = postgres(url, { prepare: false, max: 3, idle_timeout: 20, onnotice: () => {} });
   const run = (s: postgres.Sql | postgres.TransactionSql) => (text: string, params?: unknown[]) =>
     s.unsafe(text, (params ?? []) as never[]) as unknown as Promise<Record<string, unknown>[]>;
   return (db = {

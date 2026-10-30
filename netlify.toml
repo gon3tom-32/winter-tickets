@@ -1,0 +1,11 @@
+# Netlify settings. Netlify detects the Next.js app and runs its server parts
+# (seat holds, checkout, Stripe webhook, staff area) as functions automatically.
+# Secrets (DATABASE_URL, Stripe, Resend) go in Netlify's environment variable
+# settings, never in this file.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"

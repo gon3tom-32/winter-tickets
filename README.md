@@ -211,6 +211,23 @@ Database tests run on an in-memory Postgres. The many-buyers-at-once test needs 
 TEST_DATABASE_URL=postgres://localhost/tickets_test npm test
 ```
 
+## Deploying on Netlify
+
+`netlify.toml` has the build settings. Netlify detects the Next.js app and runs its server parts as functions.
+
+1. In Netlify: **Add new project → Import an existing project → GitHub**, and pick `gon3tom-32/winter-tickets`.
+   The build settings fill in from `netlify.toml`. Press **Deploy**.
+2. **Project configuration → Change project name**, for example `oc-winter-tickets`, so the address is
+   `https://oc-winter-tickets.netlify.app`.
+3. **Project configuration → Environment variables**, add (mark each as containing a secret):
+   - `DATABASE_URL`: the Supabase transaction pooler connection string (see Database above)
+   - later: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`
+   - `SITE_URL` is optional. Netlify's own address is used automatically. Set it once the site has a custom domain.
+4. **Deploys → Trigger deploy** so the new settings take effect.
+5. The Stripe webhook address is `https://<your site>/api/stripe/webhook`.
+
+Every push to `main` redeploys automatically.
+
 ## Serving from a subpath
 
 Set `BASE_PATH=/tickets` at build time if the app lives under another site's address.
