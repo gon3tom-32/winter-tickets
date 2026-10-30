@@ -10,6 +10,7 @@
 import type { Db, Query } from "./db";
 import type { Pricing, Venue } from "./types";
 import { gradeProblems, loadCart } from "./cart";
+import { releasePromoSeats, reservePromoSeats, retakePromoSeats, type PromoProblem } from "./promo";
 import { nightTitle } from "./dates";
 import { seatLabel } from "./layout";
 import type { CheckoutLine } from "./payments";
@@ -19,6 +20,7 @@ export type CheckoutInput = {
   buyerName: string;
   buyerEmail: string;
   grades: Record<string, string[] | undefined>;
+  promoCode?: string;
 };
 
 export type CheckoutProblem =
@@ -27,7 +29,8 @@ export type CheckoutProblem =
   | { reason: "invalid_email" }
   | { reason: "missing_grades"; nights: string[] }
   | { reason: "below_minimum" }
-  | { reason: "seats_changed" };
+  | { reason: "seats_changed" }
+  | { reason: "promo_invalid"; problem: PromoProblem };
 
 export type CheckoutStarted = {
   orderId: string;
@@ -62,34 +65,56 @@ export async function startCheckout(
   if (!buyer.email) return { ok: false, reason: "invalid_email" };
   const { venue, pricing } = config;
 
+  // Any problem below undoes everything this checkout did (the transaction rolls back).
+  const fail = (p: CheckoutProblem): never => {
+    throw new CheckoutFailed(p);
+  };
+
   return db.transaction(async (q): Promise<StartResult> => {
     await q(`select pg_advisory_xact_lock(hashtextextended($1, 0))`, [input.token]);
+
+    // Close any earlier unfinished checkout by this buyer. Its seats move to the new
+    // order, and any promo code seats it reserved go back to the code first.
+    const stale = await q(
+      `update orders set status = 'cancelled', cancelled_at = now()
+        where hold_token = $1 and status = 'pending'
+        returning id, stripe_session_id`,
+      [input.token],
+    );
+    for (const o of stale) await releasePromoSeats(q, o.id as string);
 
     const cart = await loadCart(q, input.token, venue, {
       multiNightPercent: pricing.multiNightDiscountPercent,
       minChargeCents: pricing.minChargeCents,
+      promoCode: input.promoCode,
+      lockPromo: true,
     });
-    if (cart.nights.length === 0) return { ok: false, reason: "empty_cart" };
+    if (cart.nights.length === 0) fail({ reason: "empty_cart" });
+    if (cart.promo && !cart.promo.valid) fail({ reason: "promo_invalid", problem: cart.promo.problem! });
     const missing = gradeProblems(cart.nights, input.grades);
-    if (missing.length) return { ok: false, reason: "missing_grades", nights: missing };
-    if (cart.quote.problem) return { ok: false, reason: "below_minimum" };
-
-    // Close any earlier unfinished checkout by this buyer; its seats move to the new order.
-    const stale = await q(
-      `update orders set status = 'cancelled', cancelled_at = now()
-        where hold_token = $1 and status = 'pending'
-        returning stripe_session_id`,
-      [input.token],
-    );
+    if (missing.length) fail({ reason: "missing_grades", nights: missing });
+    if (cart.quote.problem) fail({ reason: "below_minimum" });
 
     const free = cart.quote.totalCents === 0;
     const [order] = await q(
-      `insert into orders (buyer_name, buyer_email, total_cents, status, hold_token)
-       values ($1, $2, $3, 'pending', $4)
+      `insert into orders (buyer_name, buyer_email, total_cents, status, hold_token, promo_code_id, promo_seats)
+       values ($1, $2, $3, 'pending', $4, $5, $6)
        returning id, access_key`,
-      [buyer.name, buyer.email, cart.quote.totalCents, input.token],
+      [
+        buyer.name,
+        buyer.email,
+        cart.quote.totalCents,
+        input.token,
+        cart.promoInternal?.promoId ?? null,
+        cart.promoInternal?.seatsCovered ?? 0,
+      ],
     );
     const orderId = order.id as string;
+
+    // The code's seats are taken from its balance now, so two buyers can't both use the last one.
+    if (cart.promoInternal && !(await reservePromoSeats(q, cart.promoInternal.promoId, cart.promoInternal.seatsCovered))) {
+      fail({ reason: "promo_invalid", problem: "used_up" });
+    }
 
     const items = cart.nights.flatMap((n) => n.seats.map((s) => ({ night: n, seat: s })));
     for (const { night, seat } of items) {
@@ -112,11 +137,11 @@ export async function startCheckout(
         returning ps.seat_id`,
       [input.token, orderId, pricing.checkoutMinutes],
     );
-    if (linked.length !== items.length) throw new SeatsChanged();
+    if (linked.length !== items.length) fail({ reason: "seats_changed" });
 
     if (free) {
       const claimed = await claimSeats(q, orderId);
-      if (!claimed) throw new SeatsChanged();
+      if (!claimed) fail({ reason: "seats_changed" });
       await q(`update orders set status = 'free', paid_at = now() where id = $1`, [orderId]);
     }
 
@@ -135,12 +160,16 @@ export async function startCheckout(
       },
     };
   }).catch((e): StartResult => {
-    if (e instanceof SeatsChanged) return { ok: false, reason: "seats_changed" };
+    if (e instanceof CheckoutFailed) return { ok: false, ...e.problem };
     throw e;
   });
 }
 
-class SeatsChanged extends Error {}
+class CheckoutFailed extends Error {
+  constructor(public problem: CheckoutProblem) {
+    super(problem.reason);
+  }
+}
 
 /**
  * Marks every seat in the order sold, or none of them. A seat can be claimed if
@@ -170,6 +199,7 @@ export async function abandonCheckout(db: Db, orderId: string) {
   await db.transaction(async (q) => {
     await q(`update orders set status = 'cancelled', cancelled_at = now() where id = $1 and status = 'pending'`, [orderId]);
     await q(`update performance_seats set order_id = null where order_id = $1 and status = 'held'`, [orderId]);
+    await releasePromoSeats(q, orderId);
   });
 }
 
@@ -182,7 +212,7 @@ export async function fulfillOrder(db: Db, orderId: string, paymentIntent: strin
     if (!order) return "not_found";
     if (order.status === "paid" || order.status === "free" || order.status === "refunded") return "already_done";
 
-    if (await claimSeats(q, orderId)) {
+    if ((await retakePromoSeats(q, orderId)) && (await claimSeats(q, orderId))) {
       await q(`update orders set status = 'paid', paid_at = now(), stripe_payment_intent = $2 where id = $1`, [orderId, paymentIntent]);
       return "paid";
     }
@@ -198,6 +228,7 @@ export async function fulfillOrder(db: Db, orderId: string, paymentIntent: strin
         [orderId, paymentIntent],
       );
       await q(`update performance_seats set order_id = null where order_id = $1 and status = 'held'`, [orderId]);
+      await releasePromoSeats(q, orderId);
     });
     return "conflict" as const;
   });
@@ -214,6 +245,7 @@ export async function cancelOrder(db: Db, orderId: string): Promise<boolean> {
         where order_id = $1 and status = 'held'`,
       [orderId],
     );
+    if (done.length) await releasePromoSeats(q, orderId);
     return done.length > 0;
   });
 }

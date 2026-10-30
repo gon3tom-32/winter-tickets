@@ -5,8 +5,9 @@ import { pricing, venue } from "@/lib/config";
 import { abandonCheckout, attachSession, startCheckout } from "@/lib/orders";
 import { getPayments, orderUrl } from "@/lib/payments";
 import { sendConfirmation } from "@/lib/confirmation";
+import { normalizeCode } from "@/lib/promo";
 
-// Start checkout: { buyerName, buyerEmail, grades: { [performanceId]: string[] } }
+// Start checkout: { buyerName, buyerEmail, grades: { [performanceId]: string[] }, promoCode? }
 // Answers { url } to send the buyer to (payment page, or the order page for a free order).
 export async function POST(req: Request) {
   const db = getDb();
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
   }
 
   const payments = getPayments();
-  const result = await startCheckout(db, { token, buyerName: body?.buyerName, buyerEmail: body?.buyerEmail, grades }, { venue, pricing });
+  const result = await startCheckout(db, { token, buyerName: body?.buyerName, buyerEmail: body?.buyerEmail, grades, promoCode: normalizeCode(body?.promoCode) || undefined }, { venue, pricing });
   if (!result.ok) return NextResponse.json(result, { status: 409 });
   const s = result.started;
 

@@ -11,6 +11,15 @@ import { clock, useCountdown } from "./useCountdown";
 
 const GRADES_KEY = "grades-supported";
 const BUYER_KEY = "buyer";
+const PROMO_KEY = "promo-code";
+
+const PROMO_PROBLEMS: Record<string, string> = {
+  not_found: "We don't recognize that code. Check the spelling and try again.",
+  inactive: "That code is no longer active.",
+  expired: "That code has expired.",
+  used_up: "That code has already been used for all of its seats.",
+  not_for_these_nights: "That code doesn't apply to the nights in your cart.",
+};
 
 const CHECKOUT_PROBLEMS: Record<string, string> = {
   seats_changed: "Some of your seats were released before checkout. Please look over your cart and try again.",
@@ -45,12 +54,24 @@ export default function CartView({
   const [fieldErrors, setFieldErrors] = useState<{ name?: boolean; email?: boolean }>({});
   const [submitting, setSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+  const [promoInput, setPromoInput] = useState("");
+  const [promoCode, setPromoCode] = useState("");
   const [message, setMessage] = useState("");
   const firstError = useRef<HTMLFieldSetElement>(null);
 
   // Remember choices for this visit, so they survive going back to the map.
   useEffect(() => {
     setGrades(loadGrades());
+    try {
+      const code = sessionStorage.getItem(PROMO_KEY);
+      if (code) {
+        setPromoCode(code);
+        setPromoInput(code);
+        refresh(code);
+      }
+    } catch {
+      // Nothing saved.
+    }
     try {
       const saved = JSON.parse(sessionStorage.getItem(BUYER_KEY) ?? "null");
       if (saved) setBuyer(saved);
@@ -62,14 +83,19 @@ export default function CartView({
     try {
       sessionStorage.setItem(GRADES_KEY, JSON.stringify(grades));
       sessionStorage.setItem(BUYER_KEY, JSON.stringify(buyer));
+      sessionStorage.setItem(PROMO_KEY, promoCode);
     } catch {
       // Private browsing can block storage; choices just won't be remembered.
     }
-  }, [grades, buyer]);
+  }, [grades, buyer, promoCode]);
 
-  async function refresh() {
+  // The code currently applied, readable from callbacks without re-creating them.
+  const codeRef = useRef("");
+  codeRef.current = promoCode;
+
+  async function refresh(code = codeRef.current) {
     try {
-      const res = await fetch(asset("api/cart"), { cache: "no-store" });
+      const res = await fetch(asset(`api/cart${code ? `?code=${encodeURIComponent(code)}` : ""}`), { cache: "no-store" });
       if (res.ok) setCart(await res.json());
     } catch {
       // Try again on the next action.
@@ -106,6 +132,19 @@ export default function CartView({
     });
   }
 
+  async function applyCode(e: React.FormEvent) {
+    e.preventDefault();
+    const code = promoInput.trim();
+    setPromoCode(code);
+    await refresh(code);
+  }
+
+  function removeCode() {
+    setPromoCode("");
+    setPromoInput("");
+    refresh("");
+  }
+
   const problems = gradeProblems(cart.nights, grades);
   const q = cart.quote;
 
@@ -131,7 +170,7 @@ export default function CartView({
       const res = await fetch(asset("api/checkout"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ buyerName: buyer.name, buyerEmail: buyer.email, grades }),
+        body: JSON.stringify({ buyerName: buyer.name, buyerEmail: buyer.email, grades, promoCode }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -142,6 +181,9 @@ export default function CartView({
         setFieldErrors({ name: data.reason === "invalid_name", email: data.reason === "invalid_email" });
       } else if (data.reason === "missing_grades") {
         setShowErrors(true);
+      } else if (data.reason === "promo_invalid") {
+        setCheckoutError(PROMO_PROBLEMS[data.problem] ?? PROMO_PROBLEMS.not_found);
+        await refresh();
       } else {
         setCheckoutError(CHECKOUT_PROBLEMS[data.reason] ?? CHECKOUT_PROBLEMS.payment_error);
         if (data.reason === "seats_changed" || data.reason === "empty_cart") {
@@ -251,6 +293,35 @@ export default function CartView({
             <dd>{formatCents(q.totalCents)}</dd>
           </div>
         </dl>
+        <form className="promo" onSubmit={applyCode}>
+          <label htmlFor="promo-code">Promo code <span className="muted">(optional)</span></label>
+          <div className="promo-row">
+            <input
+              id="promo-code"
+              value={promoInput}
+              onChange={(e) => setPromoInput(e.target.value)}
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={64}
+              aria-describedby={cart.promo ? "promo-status" : undefined}
+            />
+            <button type="submit" className="button secondary" disabled={!promoInput.trim()}>
+              Apply
+            </button>
+          </div>
+          {cart.promo && (
+            <p id="promo-status" className={cart.promo.valid ? "promo-ok" : "field-error"} role="status">
+              {!cart.promo.valid
+                ? PROMO_PROBLEMS[cart.promo.problem ?? "not_found"]
+                : cart.promo.applied
+                  ? `Code applied to ${cart.promo.seatsCovered} ${cart.promo.seatsCovered === 1 ? "seat" : "seats"}.`
+                  : "Your multi-night discount is bigger than this code, so we kept that. Discounts don't combine."}
+              {" "}
+              <button type="button" className="link-button" onClick={removeCode}>Remove code</button>
+            </p>
+          )}
+        </form>
         {q.problem === "below_minimum" && (
           <p className="field-error">This total is too small to charge to a card. Please add a seat or contact us.</p>
         )}

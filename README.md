@@ -3,7 +3,7 @@
 Reserved-seat ticketing for the Orange County Classical Academy winter performance.
 Separate from the fine arts site. The fine arts site only links here.
 
-**Status: build steps 1–5 of 8 done (seat map, database, seat holds, cart and pricing, checkout).** Payments run in Stripe test mode once keys are added. The seating chart, prices, and nights are placeholders.
+**Status: build steps 1–6 of 8 done (seat map, database, seat holds, cart and pricing, checkout, promo codes).** Payments run in Stripe test mode once keys are added. The seating chart, prices, and nights are placeholders.
 
 ## Run it
 
@@ -78,7 +78,7 @@ Prices are always worked out on the server (`src/lib/pricing.ts`), in this order
 
 1. Each seat at its tier price, in cents (read from the database, so a price change shows up at once).
 2. Seats on 2 or more nights in one order: `multiNightDiscountPercent` off every seat. A third night adds nothing.
-3. A promo code's discount on the same seats (step 6).
+3. A promo code's discount on the same seats.
 4. Whichever discount is better for the buyer. They never combine.
 5. Round once, at the end. Per-seat prices are split so they add up exactly to the total.
 6. A total between 1¢ and `minChargeCents` (Stripe's 50¢ minimum) blocks checkout.
@@ -94,6 +94,31 @@ Prices are always worked out on the server (`src/lib/pricing.ts`), in this order
 5. If payment arrives but a seat is gone (the hold ran out and someone else bought it), nothing is
    sold, the payment is refunded automatically, the buyer is emailed, and the order is flagged for staff.
 6. If the payment page expires, the order is cancelled and the seats open up.
+
+### Promo codes
+
+- Each code covers a set number of seats in total, as a running balance across orders.
+  A 2-seat code covers 2 seats on one night, or 1 seat on each of 2 nights.
+- **Percent** codes take that percent off each covered seat; 100% makes them free.
+  **Dollar** codes take that amount off each covered seat, never below $0.
+- If an order has more eligible seats than the code has left, it covers the most expensive ones.
+- A code can be limited to some nights, can expire, and can be turned off. Codes are matched
+  regardless of upper or lower case, and are never deleted.
+- The code and the multi-night discount never combine: the buyer gets whichever is bigger, and the
+  cart says so. A code is only used up if it's the one applied.
+- The code's seats are reserved when checkout starts, so two buyers can't both use the last one.
+  They go back to the code if the order is cancelled, its payment page expires, or it's refunded.
+
+**Assumptions to confirm:** dollar codes are per seat (not per order), and the balance runs across
+orders (from the spec's open items).
+
+Until the staff area exists (step 7), create codes from the command line. Every code created is
+written to the audit log.
+
+```
+DATABASE_URL=... npm run promo:create -- WINTER percent 50 --seats 2
+DATABASE_URL=... npm run promo:create -- TEACHER amount 500 --seats 4 --nights night-1,night-2 --expires 2026-12-20 --for "[Name]" --reason "[Why]"
+```
 
 ### Turning on Stripe (test mode)
 
@@ -148,6 +173,6 @@ Set `BASE_PATH=/tickets` at build time if the app lives under another site's add
 3. Seat holds ← done
 4. Cart and server-side pricing ← done
 5. Stripe test checkout ← done
-6. Promo codes
+6. Promo codes ← done
 7. Staff area
 8. Polish and launch prep

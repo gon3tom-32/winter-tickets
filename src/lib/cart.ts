@@ -2,18 +2,33 @@
 import type { Query } from "./db";
 import type { Performance, Venue } from "./types";
 import { quote, type Quote } from "./pricing";
+import { checkPromo, findPromo, type PromoProblem } from "./promo";
 import { seatLabel } from "./layout";
 
 export type CartSeat = { seatId: string; label: string; tier: string; tierName: string; priceCents: number; paidCents: number };
 export type CartNight = { performance: Performance; seats: CartSeat[] };
-export type Cart = { nights: CartNight[]; quote: Quote; expiresAt: string | null };
+/** What happened to the code the buyer entered. */
+export type PromoStatus = {
+  code: string;
+  /** The code is valid for this cart. */
+  valid: boolean;
+  problem: PromoProblem | null;
+  /** The code gave the bigger discount, so it's the one used. */
+  applied: boolean;
+  seatsCovered: number;
+};
+
+export type Cart = { nights: CartNight[]; quote: Quote; expiresAt: string | null; promo: PromoStatus | null };
+
+/** Server-only details about the code, for checkout. Never sent to the browser. */
+export type CartPromoInternal = { promoId: string; seatsCovered: number } | null;
 
 export async function loadCart(
   query: Query,
   token: string,
   venue: Venue,
-  opts: { multiNightPercent: number; minChargeCents: number },
-): Promise<Cart> {
+  opts: { multiNightPercent: number; minChargeCents: number; promoCode?: string; lockPromo?: boolean },
+): Promise<Cart & { promoInternal: CartPromoInternal }> {
   const rows = await query(
     `select ps.performance_id, ps.hold_expires_at,
             s.id as seat_id, s.section, s.zone, s.row, s.number, s.accessible,
@@ -28,10 +43,25 @@ export async function loadCart(
     [token],
   );
 
-  const q = quote(
-    rows.map((r) => ({ performanceId: r.performance_id as string, seatId: r.seat_id as string, priceCents: r.price_cents as number })),
-    opts,
-  );
+  const lines = rows.map((r) => ({
+    performanceId: r.performance_id as string,
+    seatId: r.seat_id as string,
+    priceCents: r.price_cents as number,
+  }));
+  const code = opts.promoCode?.trim() ?? "";
+  const check = code && lines.length ? checkPromo(await findPromo(query, code, opts.lockPromo), lines) : null;
+  const q = quote(lines, { ...opts, promo: check?.ok ? check.option : null });
+  const applied = q.discount?.kind === "promo";
+  const promo: PromoStatus | null = check
+    ? {
+        code,
+        valid: check.ok,
+        problem: check.ok ? null : check.reason,
+        applied,
+        seatsCovered: check.ok ? check.seatsCovered : 0,
+      }
+    : null;
+  const promoInternal: CartPromoInternal = check?.ok && applied ? { promoId: check.promo.id, seatsCovered: check.seatsCovered } : null;
 
   const nights: CartNight[] = [];
   rows.forEach((r, i) => {
@@ -63,7 +93,7 @@ export async function loadCart(
   });
 
   const times = rows.map((r) => new Date(r.hold_expires_at as string).getTime());
-  return { nights, quote: q, expiresAt: times.length ? new Date(Math.min(...times)).toISOString() : null };
+  return { nights, quote: q, expiresAt: times.length ? new Date(Math.min(...times)).toISOString() : null, promo, promoInternal };
 }
 
 /**
