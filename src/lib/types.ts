@@ -31,3 +31,18 @@ export type MapSeat = Seat & {
   rowIndex: number;
   label: string;
 };
+
+export type Performance = {
+  id: string;
+  label: string;
+  /** ISO date-time, or null while the date is still a placeholder. */
+  startsAt: string | null;
+  grades: string[];
+  onSale: boolean;
+};
+
+/** What the public map shows. Comped seats show as sold. */
+export type SeatStatus = "available" | "held" | "sold";
+
+/** A seat with its tier already decided (from the database, or from the tier rules). */
+export type TieredSeat = Seat & { tier: string };

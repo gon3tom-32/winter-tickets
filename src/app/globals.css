@@ -130,3 +130,19 @@ a { color: var(--navy); }
   background: var(--white); border-top: 1px solid var(--rule); box-shadow: 0 -4px 16px rgb(20 48 94 / 0.08);
 }
 @media (min-width: 900px) { .sticky-bar { display: none; } }
+
+/* Seats that can't be chosen. Shape marks them too, not just color. */
+.dot.sold, .dot.sold[data-tier] { fill: #c9d0dc; }
+.dot.held, .dot.held[data-tier] { fill: var(--white); stroke: #8a96ab; stroke-width: 1.5; stroke-dasharray: 2.5 2; }
+.cross { stroke: #5b6b86; stroke-width: 1.6; stroke-linecap: round; }
+.seat[aria-disabled="true"] { cursor: not-allowed; }
+.seat[aria-disabled="true"]:hover .dot { opacity: 1; }
+
+/* Nights list */
+.nights { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 16px; }
+@media (min-width: 720px) { .nights { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); } }
+.night { border: 1px solid var(--rule); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 6px; }
+.night h2 { margin: 0; }
+.night .button { align-self: flex-start; margin-top: 10px; }
+.night .status { font-weight: 700; color: var(--muted); margin-top: 10px; }
+.back { display: inline-flex; align-items: center; min-height: var(--tap); font-weight: 700; }

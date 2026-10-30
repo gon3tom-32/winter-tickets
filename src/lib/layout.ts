@@ -1,8 +1,7 @@
 // The drawing rule: rows curve around the stage. The stage sits at (0, 0)
 // at the top of the map; each row is an arc, farther rows have a larger radius.
 // Nothing here is stored data. Change these numbers to change how the map looks.
-import type { Pricing, Seat, Venue, MapSeat } from "./types";
-import { tierFor } from "./tiers";
+import type { Tier, TieredSeat, Venue, MapSeat } from "./types";
 
 export const GEOMETRY = {
   firstRowRadius: 260,
@@ -19,11 +18,12 @@ export const GEOMETRY = {
 
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
-export function buildMap(seats: Seat[], venue: Venue, pricing: Pricing): MapSeat[] {
+export function buildMap(seats: TieredSeat[], venue: Venue, tiers: Tier[]): MapSeat[] {
   const g = GEOMETRY;
   const sectionOrder = venue.sections.map((s) => s.id);
   const sectionName = new Map(venue.sections.map((s) => [s.id, s.name]));
   const zoneName = new Map(venue.zones.map((z) => [z.id, z.name]));
+  const tierById = new Map(tiers.map((t) => [t.id, t]));
 
   // Front-to-back row order, with the zone each row starts in.
   const rowOrder: { row: string; zoneIndex: number }[] = [];
@@ -32,7 +32,7 @@ export function buildMap(seats: Seat[], venue: Venue, pricing: Pricing): MapSeat
   const zoneIndexOf = new Map(rowOrder.map((r) => [r.row, r.zoneIndex]));
 
   // Group seats by section + row so each row spreads evenly across its section.
-  const groups = new Map<string, Seat[]>();
+  const groups = new Map<string, TieredSeat[]>();
   for (const seat of seats) {
     const key = `${seat.section}|${seat.row}`;
     if (!groups.has(key)) groups.set(key, []);
@@ -54,7 +54,8 @@ export function buildMap(seats: Seat[], venue: Venue, pricing: Pricing): MapSeat
     sorted.forEach((seat, i) => {
       const t = sorted.length === 1 ? 0.5 : i / (sorted.length - 1);
       const angle = rad(center - g.sectionSpan / 2 + t * g.sectionSpan);
-      const tier = tierFor(seat, pricing);
+      const tier = tierById.get(seat.tier);
+      if (!tier) throw new Error(`Seat ${seat.id} has unknown tier "${seat.tier}"`);
       out.push({
         ...seat,
         tier: tier.id,

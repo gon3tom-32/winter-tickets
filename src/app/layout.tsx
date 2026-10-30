@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <a className="skip-link" href="#main">Skip to seats</a>
+        <a className="skip-link" href="#main">Skip to main content</a>
         <header className="site-header">
           <div className="wrap header-inner">
             {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import type { MapSeat, Section, Tier } from "@/lib/types";
+import type { MapSeat, SeatStatus, Section, Tier } from "@/lib/types";
 import { boundsOf, GEOMETRY, type Box } from "@/lib/layout";
 import { formatCents } from "@/lib/money";
 
@@ -10,13 +10,17 @@ type Props = {
   sections: Section[];
   tiers: Tier[];
   maxSeats: number;
+  /** Seats that can't be chosen. Seats not listed are available. */
+  statuses: Record<string, Exclude<SeatStatus, "available">>;
 };
+
+const STATUS_TEXT = { held: "on hold for another buyer", sold: "taken" } as const;
 
 type View = "all" | string;
 
 const NARROW = "(max-width: 640px)";
 
-export default function SeatMap({ seats, sections, tiers, maxSeats }: Props) {
+export default function SeatMap({ seats, sections, tiers, maxSeats, statuses }: Props) {
   const [selected, setSelected] = useState<string[]>([]);
   const [view, setView] = useState<View>("all");
   const [focusId, setFocusId] = useState<string>(() => seats[0]?.id ?? "");
@@ -67,6 +71,11 @@ export default function SeatMap({ seats, sections, tiers, maxSeats }: Props) {
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   function toggle(seat: MapSeat) {
+    const status = statuses[seat.id];
+    if (status && !selectedSet.has(seat.id)) {
+      setMessage(`${seat.label} is ${STATUS_TEXT[status]}.`);
+      return;
+    }
     const tier = tierById.get(seat.tier)!;
     if (selectedSet.has(seat.id)) {
       setSelected((cur) => cur.filter((id) => id !== seat.id));
@@ -178,6 +187,19 @@ export default function SeatMap({ seats, sections, tiers, maxSeats }: Props) {
             </svg>
             Your seats
           </li>
+          <li>
+            <svg width="18" height="18" aria-hidden="true">
+              <circle cx="9" cy="9" r="6" className="dot held" />
+            </svg>
+            On hold
+          </li>
+          <li>
+            <svg width="18" height="18" aria-hidden="true">
+              <circle cx="9" cy="9" r="7" className="dot sold" />
+              <path d="M6 6l6 6M12 6l-6 6" className="cross" />
+            </svg>
+            Taken
+          </li>
           {seats.some((s) => s.accessible) && (
             <li>
               <svg width="18" height="18" aria-hidden="true">
@@ -202,6 +224,8 @@ export default function SeatMap({ seats, sections, tiers, maxSeats }: Props) {
             {visible.map((seat) => {
               const isSel = selectedSet.has(seat.id);
               const tier = tierById.get(seat.tier)!;
+              const status = statuses[seat.id];
+              const dotClass = `dot${isSel ? " selected-dot" : ""}${status ? ` ${status}` : ""}`;
               return (
                 <g
                   key={seat.id}
@@ -210,7 +234,8 @@ export default function SeatMap({ seats, sections, tiers, maxSeats }: Props) {
                   transform={`translate(${seat.x} ${seat.y})`}
                   role="checkbox"
                   aria-checked={isSel}
-                  aria-label={`${seat.label}${seat.accessible ? ", accessible seating" : ""}, ${tier.name}, ${formatCents(seat.priceCents)}`}
+                  aria-disabled={status ? true : undefined}
+                  aria-label={`${seat.label}${seat.accessible ? ", accessible seating" : ""}, ${status ? STATUS_TEXT[status] : `${tier.name}, ${formatCents(seat.priceCents)}`}`}
                   tabIndex={seat.id === focusId ? 0 : -1}
                   onClick={() => onSeatClick(seat)}
                   onKeyDown={(e) => onSeatKey(e, seat)}
@@ -218,11 +243,12 @@ export default function SeatMap({ seats, sections, tiers, maxSeats }: Props) {
                   <circle r={r + 4} className="hit" />
                   <circle r={r + 3.5} className="ring" />
                   {seat.accessible ? (
-                    <rect x={-r} y={-r} width={r * 2} height={r * 2} rx={2} className={`dot${isSel ? " selected-dot" : ""}`} data-tier={seat.tier} />
+                    <rect x={-r} y={-r} width={r * 2} height={r * 2} rx={2} className={dotClass} data-tier={seat.tier} />
                   ) : (
-                    <circle r={r} className={`dot${isSel ? " selected-dot" : ""}`} data-tier={seat.tier} />
+                    <circle r={status === "held" ? r - 0.75 : r} className={dotClass} data-tier={seat.tier} />
                   )}
                   {isSel && <path d="M-3 0.2l2 2 4-4.1" className="check" />}
+                  {status === "sold" && <path d="M-3 -3l6 6M3 -3l-6 6" className="cross" />}
                 </g>
               );
             })}

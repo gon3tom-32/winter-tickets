@@ -3,8 +3,11 @@ import { generateSeats } from "../scripts/generate-seats.mjs";
 import { buildMap, GEOMETRY } from "@/lib/layout";
 import { tierFor } from "@/lib/tiers";
 import { formatCents } from "@/lib/money";
-import { mapSeats, pricing, seats, venue } from "@/lib/data";
+import { pricing, seats, venue } from "@/lib/config";
 import type { Pricing } from "@/lib/types";
+
+const tiered = seats.map((s) => ({ ...s, tier: tierFor(s, pricing).id }));
+const mapSeats = () => buildMap(tiered, venue, pricing.tiers);
 
 describe("seat data", () => {
   it("has 300 seats with unique ids", () => {
@@ -79,13 +82,13 @@ describe("map layout", () => {
   });
 
   it("draws a row with fewer seats without errors", () => {
-    const fewer = seats.filter((s) => !(s.id === "C-A-10" || s.id === "C-A-9"));
-    const m = buildMap(fewer, venue, pricing);
+    const fewer = tiered.filter((s) => !(s.id === "C-A-10" || s.id === "C-A-9"));
+    const m = buildMap(fewer, venue, pricing.tiers);
     expect(m.filter((s) => s.section === "C" && s.row === "A")).toHaveLength(8);
   });
 
   it("rejects a seat in a row venue.json doesn't know", () => {
-    expect(() => buildMap([{ ...seats[0], row: "Z" }], venue, pricing)).toThrow(/row "Z"/);
+    expect(() => buildMap([{ ...tiered[0], row: "Z" }], venue, pricing.tiers)).toThrow(/row "Z"/);
   });
 });
 
